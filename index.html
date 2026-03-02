@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Cone</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Inconsolata:wght@400;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --gold: #f0a500;
+    --gold-dim: #a06800;
+    --glow: rgba(240,165,0,0.5);
+    --bg: #0c0800;
+    --border: rgba(240,165,0,0.2);
+  }
+
+  body {
+    background: var(--bg);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Inconsolata', monospace;
+    overflow: hidden;
+    color: var(--gold);
+  }
+
+  /* Vignette */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse 70% 70% at 50% 50%, transparent 40%, rgba(0,0,0,0.85) 100%);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Subtle noise texture */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    opacity: 0.4;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 14px;
+    position: relative;
+    z-index: 5;
+  }
+
+  h1 {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 38px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--gold);
+    text-shadow: 0 0 24px var(--glow), 0 0 60px rgba(240,165,0,0.2);
+    line-height: 1;
+  }
+
+  h1 span {
+    color: rgba(240,165,0,0.4);
+    font-weight: 400;
+  }
+
+  .subtitle {
+    font-size: 10px;
+    letter-spacing: 0.5em;
+    color: rgba(240,165,0,0.3);
+    margin-top: 5px;
+    text-transform: uppercase;
+  }
+
+  /* Divider line */
+  .divider {
+    width: 200px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    margin: 10px auto 0;
+    opacity: 0.4;
+  }
+
+  #canvas-wrap {
+    position: relative;
+    z-index: 5;
+    border: 1px solid var(--border);
+    box-shadow:
+      0 0 0 1px rgba(240,165,0,0.05),
+      0 0 60px rgba(240,165,0,0.07),
+      inset 0 0 60px rgba(0,0,0,0.6);
+  }
+
+  canvas { display: block; }
+
+  /* Stats */
+  .stats {
+    display: flex;
+    gap: 0;
+    margin-top: 14px;
+    position: relative;
+    z-index: 5;
+    border: 1px solid var(--border);
+  }
+
+  .stat {
+    text-align: center;
+    padding: 8px 22px;
+    border-right: 1px solid var(--border);
+  }
+  .stat:last-child { border-right: none; }
+
+  .stat .val {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--gold);
+    text-shadow: 0 0 12px var(--glow);
+    line-height: 1;
+  }
+
+  .stat .key {
+    font-size: 9px;
+    letter-spacing: 0.35em;
+    color: rgba(240,165,0,0.3);
+    text-transform: uppercase;
+    margin-top: 3px;
+  }
+
+  /* Sliders */
+  .sliders {
+    display: flex;
+    gap: 24px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+    justify-content: center;
+    position: relative;
+    z-index: 5;
+  }
+
+  .sl-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .sl-group label {
+    font-size: 9px;
+    letter-spacing: 0.35em;
+    color: rgba(240,165,0,0.35);
+    text-transform: uppercase;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 110px;
+    height: 1px;
+    background: rgba(240,165,0,0.2);
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 11px;
+    height: 11px;
+    background: var(--gold);
+    box-shadow: 0 0 8px var(--glow);
+    cursor: pointer;
+    border-radius: 50%;
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    gap: 6px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+    justify-content: center;
+    position: relative;
+    z-index: 5;
+  }
+
+  button {
+    background: transparent;
+    border: 1px solid rgba(240,165,0,0.25);
+    color: rgba(240,165,0,0.5);
+    font-family: 'Inconsolata', monospace;
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    padding: 6px 14px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.15s;
+  }
+
+  button:hover {
+    background: rgba(240,165,0,0.08);
+    color: var(--gold);
+    border-color: rgba(240,165,0,0.6);
+    box-shadow: 0 0 14px rgba(240,165,0,0.15);
+  }
+
+  .hint {
+    margin-top: 10px;
+    font-size: 9px;
+    letter-spacing: 0.35em;
+    color: rgba(240,165,0,0.15);
+    text-transform: uppercase;
+    position: relative;
+    z-index: 5;
+  }
+
+  /* Corner accents */
+  .ca {
+    position: fixed;
+    width: 28px;
+    height: 28px;
+    z-index: 6;
+  }
+  .ca::before, .ca::after {
+    content: '';
+    position: absolute;
+    background: var(--gold);
+    opacity: 0.35;
+  }
+  .ca::before { width: 100%; height: 1px; top: 0; left: 0; }
+  .ca::after  { width: 1px; height: 100%; top: 0; left: 0; }
+  .ca.tr { top: 14px; right: 14px; transform: scaleX(-1); }
+  .ca.tl { top: 14px; left: 14px; }
+  .ca.br { bottom: 14px; right: 14px; transform: scale(-1); }
+  .ca.bl { bottom: 14px; left: 14px; transform: scaleY(-1); }
+</style>
+</head>
+<body>
+
+<div class="ca tl"></div>
+<div class="ca tr"></div>
+<div class="ca bl"></div>
+<div class="ca br"></div>
+
+<header>
+  <h1>CONE <span>// 3D</span></h1>
+  <p class="subtitle">Interactive Geometry Model</p>
+  <div class="divider"></div>
+</header>
+
+<div id="canvas-wrap">
+  <canvas id="c" width="480" height="360"></canvas>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="val" id="rVal">80</div><div class="key">Radius</div></div>
+  <div class="stat"><div class="val" id="hVal">220</div><div class="key">Height</div></div>
+  <div class="stat"><div class="val" id="sVal">40</div><div class="key">Segments</div></div>
+</div>
+
+<div class="sliders">
+  <div class="sl-group"><label>Radius</label><input type="range" id="rSlider" min="15" max="150" value="80"></div>
+  <div class="sl-group"><label>Height</label><input type="range" id="hSlider" min="40" max="340" value="220"></div>
+  <div class="sl-group"><label>Segments</label><input type="range" id="sSlider" min="3" max="64" value="40"></div>
+</div>
+
+<div class="controls">
+  <button id="toggleBtn">Pause</button>
+  <button id="resetBtn">Reset</button>
+  <button id="wireBtn">Wireframe</button>
+  <button id="flipBtn">Flip</button>
+  <button id="slowBtn">Slower</button>
+  <button id="fastBtn">Faster</button>
+</div>
+
+<p class="hint">drag to rotate · scroll to zoom</p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+  const canvas = document.getElementById('c');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(480, 360);
+  renderer.setClearColor(0x000000, 0);
+  renderer.shadowMap.enabled = true;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, 480 / 360, 0.1, 2000);
+  camera.position.set(0, 50, 360);
+  camera.lookAt(0, 0, 0);
+
+  // Lighting — warm golden scheme
+  scene.add(new THREE.AmbientLight(0xf0a500, 0.25));
+
+  const key = new THREE.DirectionalLight(0xffd060, 1.4);
+  key.position.set(200, 350, 200);
+  scene.add(key);
+
+  const fill = new THREE.DirectionalLight(0xff6600, 0.4);
+  fill.position.set(-200, -100, 100);
+  scene.add(fill);
+
+  const back = new THREE.PointLight(0xf0a500, 0.6, 800);
+  back.position.set(0, -200, -200);
+  scene.add(back);
+
+  // State
+  let radius = 80, height = 220, segments = 40;
+  let wireframe = false;
+  let flipped = false;
+  let cone, wireMesh, grid;
+
+  function buildCone() {
+    if (cone) { scene.remove(cone); cone.geometry.dispose(); cone.material.dispose(); }
+    if (wireMesh) { scene.remove(wireMesh); wireMesh.geometry.dispose(); wireMesh.material.dispose(); }
+
+    const geo = new THREE.ConeGeometry(radius, height, segments, 1, false);
+
+    const mat = new THREE.MeshPhongMaterial({
+      color: 0x8b4500,
+      emissive: 0x2a1000,
+      specular: 0xf0a500,
+      shininess: 100,
+      transparent: true,
+      opacity: wireframe ? 0.07 : 0.88,
+      side: THREE.DoubleSide,
+    });
+
+    cone = new THREE.Mesh(geo, mat);
+    cone.rotation.z = flipped ? Math.PI : 0;
+    scene.add(cone);
+
+    // Glowing wireframe
+    const wGeo = new THREE.WireframeGeometry(geo);
+    const wMat = new THREE.LineBasicMaterial({
+      color: 0xf0a500,
+      transparent: true,
+      opacity: wireframe ? 0.85 : 0.22,
+    });
+    wireMesh = new THREE.LineSegments(wGeo, wMat);
+    wireMesh.rotation.z = flipped ? Math.PI : 0;
+    scene.add(wireMesh);
+
+    // Update grid
+    if (grid) scene.remove(grid);
+    grid = new THREE.GridHelper(500, 22, 0xf0a500, 0x2a1800);
+    grid.position.y = flipped ? height / 2 + 8 : -height / 2 - 8;
+    grid.material.opacity = 0.25;
+    grid.material.transparent = true;
+    scene.add(grid);
+  }
+
+  buildCone();
+
+  // Rotation state
+  let spinning = true;
+  let spinSpeed = 0.009;
+  let rotX = 0.18, rotY = 0;
+  let isDragging = false, lastX, lastY;
+
+  canvas.addEventListener('mousedown', e => { isDragging = true; lastX = e.clientX; lastY = e.clientY; });
+  window.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    rotY += (e.clientX - lastX) * 0.008;
+    rotX += (e.clientY - lastY) * 0.005;
+    rotX = Math.max(-1.4, Math.min(1.4, rotX));
+    lastX = e.clientX; lastY = e.clientY;
+  });
+  window.addEventListener('mouseup', () => isDragging = false);
+
+  canvas.addEventListener('touchstart', e => { isDragging = true; lastX = e.touches[0].clientX; lastY = e.touches[0].clientY; });
+  window.addEventListener('touchmove', e => {
+    if (!isDragging) return;
+    rotY += (e.touches[0].clientX - lastX) * 0.008;
+    rotX += (e.touches[0].clientY - lastY) * 0.005;
+    lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+  });
+  window.addEventListener('touchend', () => isDragging = false);
+
+  canvas.addEventListener('wheel', e => {
+    camera.position.z = Math.max(80, Math.min(700, camera.position.z + e.deltaY * 0.35));
+    e.preventDefault();
+  }, { passive: false });
+
+  function applyRotation() {
+    const baseZ = flipped ? Math.PI : 0;
+    cone.rotation.set(rotX, rotY, baseZ);
+    wireMesh.rotation.set(rotX, rotY, baseZ);
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+    if (spinning && !isDragging) rotY += spinSpeed;
+    applyRotation();
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  function updateStats() {
+    document.getElementById('rVal').textContent = radius;
+    document.getElementById('hVal').textContent = height;
+    document.getElementById('sVal').textContent = segments;
+    buildCone();
+    applyRotation();
+  }
+
+  document.getElementById('rSlider').addEventListener('input', e => { radius = +e.target.value; updateStats(); });
+  document.getElementById('hSlider').addEventListener('input', e => { height = +e.target.value; updateStats(); });
+  document.getElementById('sSlider').addEventListener('input', e => { segments = +e.target.value; updateStats(); });
+
+  const toggleBtn = document.getElementById('toggleBtn');
+  toggleBtn.addEventListener('click', () => {
+    spinning = !spinning;
+    toggleBtn.textContent = spinning ? 'Pause' : 'Play';
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    radius = 80; height = 220; segments = 40;
+    spinSpeed = 0.009; spinning = true; flipped = false;
+    rotX = 0.18; rotY = 0;
+    camera.position.z = 360;
+    wireframe = false;
+    document.getElementById('rSlider').value = 80;
+    document.getElementById('hSlider').value = 220;
+    document.getElementById('sSlider').value = 40;
+    document.getElementById('wireBtn').textContent = 'Wireframe';
+    document.getElementById('flipBtn').textContent = 'Flip';
+    toggleBtn.textContent = 'Pause';
+    updateStats();
+  });
+
+  document.getElementById('wireBtn').addEventListener('click', () => {
+    wireframe = !wireframe;
+    document.getElementById('wireBtn').textContent = wireframe ? 'Solid' : 'Wireframe';
+    buildCone(); applyRotation();
+  });
+
+  document.getElementById('flipBtn').addEventListener('click', () => {
+    flipped = !flipped;
+    document.getElementById('flipBtn').textContent = flipped ? 'Unflip' : 'Flip';
+    buildCone(); applyRotation();
+  });
+
+  document.getElementById('slowBtn').addEventListener('click', () => { spinSpeed = Math.min(spinSpeed + 0.003, 0.06); });
+  document.getElementById('fastBtn').addEventListener('click', () => { spinSpeed = Math.max(spinSpeed - 0.002, 0.001); });
+</script>
+</body>
+</html>
